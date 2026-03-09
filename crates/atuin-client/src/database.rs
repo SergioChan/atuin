@@ -559,14 +559,6 @@ impl Database for Sqlite {
         }
 
         filter_options
-            .exit
-            .map(|exit| sql.and_where_eq("exit", exit));
-
-        filter_options
-            .exclude_exit
-            .map(|exclude_exit| sql.and_where_ne("exit", exclude_exit));
-
-        filter_options
             .cwd
             .map(|cwd| sql.and_where_eq("cwd", quote(cwd)));
 
@@ -612,10 +604,18 @@ impl Database for Sqlite {
         let mut seen_commands = HashSet::new();
         let deduped = ordered
             .into_iter()
-            .filter(|entry| seen_commands.insert(entry.command.clone()))
+            .filter(|entry| seen_commands.insert(entry.command.clone()));
+
+        let filtered = deduped
+            .filter(|entry| {
+                filter_options.exit.is_none_or(|exit| entry.exit == exit)
+                    && filter_options
+                        .exclude_exit
+                        .is_none_or(|exclude_exit| entry.exit != exclude_exit)
+            })
             .collect();
 
-        Ok(deduped)
+        Ok(filtered)
     }
 
     async fn query_history(&self, query: &str) -> Result<Vec<History>> {
